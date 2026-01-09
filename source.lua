@@ -461,6 +461,12 @@ end
 function Midlight:CreateWindow(config)
     config = config or {}
     
+    -- Responsive Detection
+    local function CheckMobile()
+        local ViewportSize = workspace.CurrentCamera.ViewportSize
+        return ViewportSize.X < 800
+    end
+
     local Window = {
         Name = config.Name or "Midlight UI",
         ConfigFile = config.ConfigFile or "Default",
@@ -469,8 +475,9 @@ function Midlight:CreateWindow(config)
         TabButtons = {},
         CurrentTab = nil,
         Minimized = false,
-        SidebarCollapsed = false,
         Visible = true,
+        MobileMode = CheckMobile(),
+        SidebarCollapsed = CheckMobile(),
     }
     
     -- Apply theme
@@ -529,7 +536,7 @@ function Midlight:CreateWindow(config)
         BackgroundColor3 = CurrentTheme.Primary,
         BorderSizePixel = 0,
         Position = UDim2.new(0.5, 0, 0.5, 0),
-        Size = UDim2.new(0, 400, 0, 200),
+        Size = UDim2.new(0, 340, 0, 160),
         AnchorPoint = Vector2.new(0.5, 0.5),
         ZIndex = 50,
     }, {
@@ -559,7 +566,7 @@ function Midlight:CreateWindow(config)
             BackgroundColor3 = CurrentTheme.Tertiary,
             BorderSizePixel = 0,
             Position = UDim2.new(0.5, 0, 0.6, 0),
-            Size = UDim2.new(0.7, 0, 0, 6),
+            Size = UDim2.new(0.7, 0, 0, 5),
             AnchorPoint = Vector2.new(0.5, 0.5),
         }, {
             Utility.Create("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -597,6 +604,57 @@ function Midlight:CreateWindow(config)
         }),
     })
     
+    function Window:UpdateResponsive()
+        local isMobile = CheckMobile()
+        if isMobile == Window.MobileMode then return end
+        
+        Window.MobileMode = isMobile
+        Window.SidebarCollapsed = isMobile
+        
+        -- Update MainFrame
+        local targetSize = Window.Minimized and 
+            (isMobile and UDim2.new(0, 360, 0, 40) or UDim2.new(0, 520, 0, 40)) or
+            (isMobile and UDim2.new(0, 360, 0, 480) or UDim2.new(0, 520, 0, 380))
+        
+        Utility.Tween(MainFrame, { Size = targetSize }, 0.4)
+        
+        -- Update Sidebar
+        if isMobile then
+            Sidebar.Position = UDim2.new(0, -180, 0, 40)
+            Sidebar.Size = UDim2.new(0, 180, 1, -40)
+            Sidebar.BackgroundTransparency = 0.05
+            if Sidebar:FindFirstChild("RightFix") then Sidebar.RightFix.Visible = false end
+            if Sidebar:FindFirstChild("TopFix") then Sidebar.TopFix.Visible = false end
+            if DrawerOverlay then DrawerOverlay.Visible = false end
+        else
+            Sidebar.Position = UDim2.new(0, 0, 0, 40)
+            Sidebar.Size = UDim2.new(0, 160, 1, -40)
+            Sidebar.BackgroundTransparency = 0
+            if Sidebar:FindFirstChild("RightFix") then Sidebar.RightFix.Visible = true end
+            if Sidebar:FindFirstChild("TopFix") then Sidebar.TopFix.Visible = true end
+        end
+        
+        -- Update ContentArea
+        Utility.Tween(ContentArea, {
+            Position = isMobile and UDim2.new(0, 0, 0, 40) or UDim2.new(0, 160, 0, 40),
+            Size = isMobile and UDim2.new(1, 0, 1, -40) or UDim2.new(1, -160, 1, -40)
+        }, 0.4)
+        
+        -- Update Search & Tabs
+        if isMobile then
+            Utility.Tween(SearchContainer, { Size = UDim2.new(1, -20, 0, 32) }, 0.3)
+            SearchContainer.SearchBox.Visible = true
+            for _, tabBtn in pairs(Window.TabButtons) do
+                Utility.Tween(tabBtn, { Size = UDim2.new(1, 0, 0, 36) }, 0.3)
+                if tabBtn:FindFirstChild("Title") then tabBtn.Title.Visible = true end
+            end
+        end
+    end
+    
+    table.insert(Midlight.Connections, workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+        Window:UpdateResponsive()
+    end))
+    
     -- Loading Animation
     local LoadingFill = LoadingScreen.LoadingBarBG.Fill
     local LoadingStatus = LoadingScreen.Status
@@ -615,17 +673,25 @@ function Midlight:CreateWindow(config)
         BackgroundColor3 = CurrentTheme.Primary,
         BorderSizePixel = 0,
         Position = UDim2.new(0.5, 0, 0.5, 0),
-        Size = UDim2.new(0, 800, 0, 550),
+        Size = Window.MobileMode and UDim2.new(0, 360, 0, 480) or UDim2.new(0, 520, 0, 380),
         AnchorPoint = Vector2.new(0.5, 0.5),
         ClipsDescendants = true,
+        BackgroundTransparency = 0.1,
         Visible = false,
     }, {
-        Utility.Create("UICorner", { CornerRadius = UDim.new(0, 12) }),
+        Utility.Create("UICorner", { CornerRadius = UDim.new(0, 16) }),
         Utility.Create("UIStroke", { 
             Name = "Border",
             Color = CurrentTheme.Border, 
-            Thickness = 1,
-            Transparency = 0.3,
+            Thickness = 1.2,
+            Transparency = 0.4,
+        }),
+        Utility.Create("UIGradient", {
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230)),
+            }),
+            Rotation = 45,
         }),
     })
     
@@ -640,7 +706,7 @@ function Midlight:CreateWindow(config)
         ZIndex = -1,
         Image = "rbxassetid://5554236805",
         ImageColor3 = CurrentTheme.Shadow,
-        ImageTransparency = 0.5,
+        ImageTransparency = 0.65,
         ScaleType = Enum.ScaleType.Slice,
         SliceCenter = Rect.new(23, 23, 277, 277),
     })
@@ -655,7 +721,7 @@ function Midlight:CreateWindow(config)
         Parent = MainFrame,
         BackgroundColor3 = CurrentTheme.Secondary,
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 50),
+        Size = UDim2.new(1, 0, 0, 40),
     }, {
         Utility.Create("UICorner", { CornerRadius = UDim.new(0, 12) }),
         
@@ -702,7 +768,7 @@ function Midlight:CreateWindow(config)
         Parent = Topbar,
         BackgroundTransparency = 1,
         Position = UDim2.new(1, -15, 0.5, 0),
-        Size = UDim2.new(0, 90, 0, 30),
+        Size = UDim2.new(0, 72, 0, 24),
         AnchorPoint = Vector2.new(1, 0.5),
     }, {
         Utility.Create("UIListLayout", {
@@ -717,7 +783,7 @@ function Midlight:CreateWindow(config)
         Name = "Minimize",
         Parent = Controls,
         BackgroundColor3 = CurrentTheme.Tertiary,
-        Size = UDim2.new(0, 30, 0, 30),
+        Size = UDim2.new(0, 24, 0, 24),
         Image = Icons.Minimize,
         ImageColor3 = CurrentTheme.TextDark,
     }, {
@@ -729,7 +795,7 @@ function Midlight:CreateWindow(config)
         Name = "Close",
         Parent = Controls,
         BackgroundColor3 = CurrentTheme.Error,
-        Size = UDim2.new(0, 30, 0, 30),
+        Size = UDim2.new(0, 24, 0, 24),
         Image = Icons.Close,
         ImageColor3 = Color3.fromRGB(255, 255, 255),
     }, {
@@ -744,29 +810,43 @@ function Midlight:CreateWindow(config)
         Parent = MainFrame,
         BackgroundColor3 = CurrentTheme.Secondary,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 0, 0, 50),
-        Size = UDim2.new(0, 200, 1, -50),
+        Position = Window.MobileMode and UDim2.new(0, -180, 0, 40) or UDim2.new(0, 0, 0, 40),
+        Size = UDim2.new(0, Window.MobileMode and 180 or 160, 1, -40),
+        ZIndex = 5,
+        BackgroundTransparency = Window.MobileMode and 0.05 or 0,
     }, {
         Utility.Create("UICorner", { CornerRadius = UDim.new(0, 12) }),
         
-        -- Fix top-right and bottom-right corners
-        Utility.Create("Frame", {
+        -- Fix corners (only for desktop)
+        not Window.MobileMode and Utility.Create("Frame", {
             Name = "RightFix",
             BackgroundColor3 = CurrentTheme.Secondary,
             BorderSizePixel = 0,
             Position = UDim2.new(1, -12, 0, 0),
             Size = UDim2.new(0, 12, 1, 0),
-        }),
+        }) or nil,
         
-        -- Fix top-left corner
-        Utility.Create("Frame", {
+        not Window.MobileMode and Utility.Create("Frame", {
             Name = "TopFix",
             BackgroundColor3 = CurrentTheme.Secondary,
             BorderSizePixel = 0,
             Position = UDim2.new(0, 0, 0, 0),
             Size = UDim2.new(1, 0, 0, 12),
-        }),
+        }) or nil,
     })
+    
+    -- Drawer Overlay for Mobile
+    local DrawerOverlay = Window.MobileMode and Utility.Create("TextButton", {
+        Name = "DrawerOverlay",
+        Parent = MainFrame,
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 40),
+        Size = UDim2.new(1, 0, 1, -40),
+        Text = "",
+        Visible = false,
+        ZIndex = 4,
+    }) or nil
     
     -- Search Box
     local SearchContainer = Utility.Create("Frame", {
@@ -775,7 +855,7 @@ function Midlight:CreateWindow(config)
         BackgroundColor3 = CurrentTheme.Tertiary,
         BorderSizePixel = 0,
         Position = UDim2.new(0.5, 0, 0, 15),
-        Size = UDim2.new(1, -24, 0, 38),
+        Size = UDim2.new(1, -20, 0, 32),
         AnchorPoint = Vector2.new(0.5, 0),
     }, {
         Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
@@ -812,10 +892,10 @@ function Midlight:CreateWindow(config)
         Parent = Sidebar,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 12, 0, 65),
-        Size = UDim2.new(1, -24, 1, -130),
+        Position = UDim2.new(0, 12, 0, 57),
+        Size = UDim2.new(1, -24, 1, -110),
         CanvasSize = UDim2.new(0, 0, 0, 0),
-        ScrollBarThickness = 3,
+        ScrollBarThickness = Window.MobileMode and 5 or 3,
         ScrollBarImageColor3 = CurrentTheme.Accent,
         ScrollBarImageTransparency = 0.5,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -873,9 +953,10 @@ function Midlight:CreateWindow(config)
         Name = "Content",
         Parent = MainFrame,
         BackgroundColor3 = CurrentTheme.Primary,
+        BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 200, 0, 50),
-        Size = UDim2.new(1, -200, 1, -50),
+        Position = Window.MobileMode and UDim2.new(0, 0, 0, 40) or UDim2.new(0, 160, 0, 40),
+        Size = Window.MobileMode and UDim2.new(1, 0, 1, -40) or UDim2.new(1, -160, 1, -40),
         ClipsDescendants = true,
     })
     
@@ -927,10 +1008,13 @@ function Midlight:CreateWindow(config)
         PlaySound("Click")
         Window.Minimized = not Window.Minimized
         
-        if Window.Minimized then
-            Utility.Tween(MainFrame, { Size = UDim2.new(0, 800, 0, 50) }, 0.4, Enum.EasingStyle.Quint)
-            Utility.Tween(ContentArea, { BackgroundTransparency = 1 }, 0.2)
-            Utility.Tween(Sidebar, { BackgroundTransparency = 1 }, 0.2)
+        local TargetSize = Window.Minimized and 
+            (Window.MobileMode and UDim2.new(0, 360, 0, 40) or UDim2.new(0, 520, 0, 40)) or
+            (Window.MobileMode and UDim2.new(0, 360, 0, 480) or UDim2.new(0, 520, 0, 380))
+            
+        Utility.Tween(MainFrame, { Size = TargetSize }, 0.4, Enum.EasingStyle.Quint)
+        Utility.Tween(ContentArea, { BackgroundTransparency = 1 }, 0.2)
+        Utility.Tween(Sidebar, { BackgroundTransparency = 1 }, 0.2)
             
             for _, child in pairs(Sidebar:GetDescendants()) do
                 if child:IsA("GuiObject") then
@@ -956,12 +1040,13 @@ function Midlight:CreateWindow(config)
                 end
             end
         else
-            Utility.Tween(MainFrame, { Size = UDim2.new(0, 800, 0, 550) }, 0.4, Enum.EasingStyle.Quint)
+            local TargetSize = Window.MobileMode and UDim2.new(0, 360, 0, 480) or UDim2.new(0, 520, 0, 380)
+            Utility.Tween(MainFrame, { Size = TargetSize }, 0.4, Enum.EasingStyle.Quint)
             
             task.wait(0.2)
             
-            Utility.Tween(ContentArea, { BackgroundTransparency = 0 }, 0.3)
-            Utility.Tween(Sidebar, { BackgroundTransparency = 0 }, 0.3)
+            Utility.Tween(ContentArea, { BackgroundTransparency = 1 }, 0.3)
+            Utility.Tween(Sidebar, { BackgroundTransparency = Window.MobileMode and 0.05 or 0 }, 0.3)
             
             for _, child in pairs(Sidebar:GetDescendants()) do
                 if child:IsA("Frame") and child.Name ~= "RightFix" and child.Name ~= "TopFix" then
@@ -1018,32 +1103,62 @@ function Midlight:CreateWindow(config)
         PlaySound("Click")
         Window.SidebarCollapsed = not Window.SidebarCollapsed
         
-        if Window.SidebarCollapsed then
-            Utility.Tween(Sidebar, { Size = UDim2.new(0, 60, 1, -50) }, 0.4)
-            Utility.Tween(ContentArea, { Position = UDim2.new(0, 60, 0, 50), Size = UDim2.new(1, -60, 1, -50) }, 0.4)
-            Utility.Tween(SearchContainer, { Size = UDim2.new(0, 36, 0, 38) }, 0.3)
-            SearchContainer.SearchBox.Visible = false
+        if Window.MobileMode then
+            local isOpen = Window.SidebarCollapsed -- In mobile, collapsed means closed, but here we toggle
+            -- Wait, let's redefine: SidebarCollapsed true means Sidebar is NOT visible on mobile (drawer closed)
+            -- Actually let's just use it as is: false = expanded/visible, true = collapsed/hidden
             
-            for _, tabBtn in pairs(Window.TabButtons) do
-                Utility.Tween(tabBtn, { Size = UDim2.new(0, 36, 0, 40) }, 0.3)
-                if tabBtn:FindFirstChild("Title") then
-                    tabBtn.Title.Visible = false
+            if Window.SidebarCollapsed then
+                Utility.Tween(Sidebar, { Position = UDim2.new(0, -180, 0, 40) }, 0.4)
+                if DrawerOverlay then
+                    Utility.Tween(DrawerOverlay, { BackgroundTransparency = 1 }, 0.3)
+                    task.delay(0.3, function() DrawerOverlay.Visible = false end)
+                end
+            else
+                Sidebar.Visible = true
+                Utility.Tween(Sidebar, { Position = UDim2.new(0, 0, 0, 40) }, 0.4)
+                if DrawerOverlay then
+                    DrawerOverlay.Visible = true
+                    Utility.Tween(DrawerOverlay, { BackgroundTransparency = 0.5 }, 0.3)
                 end
             end
         else
-            Utility.Tween(Sidebar, { Size = UDim2.new(0, 200, 1, -50) }, 0.4)
-            Utility.Tween(ContentArea, { Position = UDim2.new(0, 200, 0, 50), Size = UDim2.new(1, -200, 1, -50) }, 0.4)
-            Utility.Tween(SearchContainer, { Size = UDim2.new(1, -24, 0, 38) }, 0.3)
-            SearchContainer.SearchBox.Visible = true
-            
-            for _, tabBtn in pairs(Window.TabButtons) do
-                Utility.Tween(tabBtn, { Size = UDim2.new(1, 0, 0, 40) }, 0.3)
-                if tabBtn:FindFirstChild("Title") then
-                    tabBtn.Title.Visible = true
+            if Window.SidebarCollapsed then
+                Utility.Tween(Sidebar, { Size = UDim2.new(0, 52, 1, -40) }, 0.4)
+                Utility.Tween(ContentArea, { Position = UDim2.new(0, 52, 0, 40), Size = UDim2.new(1, -52, 1, -40) }, 0.4)
+                Utility.Tween(SearchContainer, { Size = UDim2.new(0, 30, 0, 32) }, 0.3)
+                SearchContainer.SearchBox.Visible = false
+                
+                for _, tabBtn in pairs(Window.TabButtons) do
+                    Utility.Tween(tabBtn, { Size = UDim2.new(0, 30, 0, 36) }, 0.3)
+                    if tabBtn:FindFirstChild("Title") then
+                        tabBtn.Title.Visible = false
+                    end
+                end
+            else
+                Utility.Tween(Sidebar, { Size = UDim2.new(0, 160, 1, -40) }, 0.4)
+                Utility.Tween(ContentArea, { Position = UDim2.new(0, 160, 0, 40), Size = UDim2.new(1, -160, 1, -40) }, 0.4)
+                Utility.Tween(SearchContainer, { Size = UDim2.new(1, -20, 0, 32) }, 0.3)
+                SearchContainer.SearchBox.Visible = true
+                
+                for _, tabBtn in pairs(Window.TabButtons) do
+                    Utility.Tween(tabBtn, { Size = UDim2.new(1, 0, 0, 36) }, 0.3)
+                    if tabBtn:FindFirstChild("Title") then
+                        tabBtn.Title.Visible = true
+                    end
                 end
             end
         end
     end)
+    
+    if Window.MobileMode and DrawerOverlay then
+        DrawerOverlay.MouseButton1Click:Connect(function()
+            Window.SidebarCollapsed = true
+            Utility.Tween(Sidebar, { Position = UDim2.new(0, -180, 0, 40) }, 0.4)
+            Utility.Tween(DrawerOverlay, { BackgroundTransparency = 1 }, 0.3)
+            task.delay(0.3, function() DrawerOverlay.Visible = false end)
+        end)
+    end
     
     -- Global Toggle (RightShift)
     table.insert(Midlight.Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -1142,17 +1257,17 @@ function Midlight:CreateWindow(config)
             Position = UDim2.new(0, 0, 0, 0),
             Size = UDim2.new(1, 0, 1, 0),
             CanvasSize = UDim2.new(0, 0, 0, 0),
-            ScrollBarThickness = 4,
+            ScrollBarThickness = Window.MobileMode and 5 or 3,
             ScrollBarImageColor3 = CurrentTheme.Accent,
             ScrollBarImageTransparency = 0.5,
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             Visible = false,
         }, {
             Utility.Create("UIPadding", {
-                PaddingTop = UDim.new(0, 20),
-                PaddingBottom = UDim.new(0, 20),
-                PaddingLeft = UDim.new(0, 20),
-                PaddingRight = UDim.new(0, 20),
+                PaddingTop = UDim.new(0, Window.MobileMode and 10 or 20),
+                PaddingBottom = UDim.new(0, Window.MobileMode and 10 or 20),
+                PaddingLeft = UDim.new(0, Window.MobileMode and 10 or 20),
+                PaddingRight = UDim.new(0, Window.MobileMode and 10 or 20),
             }),
             
             Utility.Create("UIListLayout", {
@@ -1262,13 +1377,13 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 45),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 50 or 45),
                     Text = "",
                     AutoButtonColor = false,
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -1343,11 +1458,11 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 55 or 50),
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -1478,11 +1593,11 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 65),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 75 or 65),
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -1656,12 +1771,12 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 55 or 50),
                     ClipsDescendants = true,
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -1892,11 +2007,11 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 45),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 50 or 45),
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -2023,11 +2138,11 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 55 or 50),
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -2167,12 +2282,12 @@ function Midlight:CreateWindow(config)
                     Parent = SectionFrame,
                     BackgroundColor3 = CurrentTheme.Tertiary,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 45),
+                    Size = UDim2.new(1, 0, 0, Window.MobileMode and 50 or 45),
                     ClipsDescendants = true,
                     LayoutOrder = LayoutOrder,
                 }, {
-                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 8) }),
-                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1, Transparency = 0.5 }),
+                    Utility.Create("UICorner", { CornerRadius = UDim.new(0, 10) }),
+                    Utility.Create("UIStroke", { Color = CurrentTheme.Border, Thickness = 1.2, Transparency = 0.5 }),
                     
                     Utility.Create("TextLabel", {
                         Name = "Title",
@@ -2870,7 +2985,8 @@ function Midlight:CreateWindow(config)
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
         MainFrame.BackgroundTransparency = 1
         
-        Utility.Tween(MainFrame, { Size = UDim2.new(0, 800, 0, 550), BackgroundTransparency = 0 }, 0.6, Enum.EasingStyle.Back)
+        local finalSize = Window.MobileMode and UDim2.new(0, 360, 0, 480) or UDim2.new(0, 520, 0, 380)
+        Utility.Tween(MainFrame, { Size = finalSize, BackgroundTransparency = 0.1 }, 0.6, Enum.EasingStyle.Back)
         
         -- Load config
         task.wait(0.5)
