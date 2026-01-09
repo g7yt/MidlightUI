@@ -2706,6 +2706,20 @@ function Midlight:CreateWindow(config)
     --══════════════════════════════════════════════════════════════════════════
     -- TAB SELECTION
     --══════════════════════════════════════════════════════════════════════════
+    function Window:SetVisible(state)
+        Window.Visible = state
+        MainFrame.Visible = state
+        if state and Window.MobileMode then
+            -- Reset drawer state on mobile show if needed
+            Window.SidebarCollapsed = true
+            Sidebar.Position = UDim2.new(0, -180, 0, 40)
+            if DrawerOverlay then
+                DrawerOverlay.Visible = false
+                DrawerOverlay.BackgroundTransparency = 1
+            end
+        end
+    end
+    
     function Window:SelectTab(tab)
         if Window.CurrentTab == tab then return end
         
